@@ -14,19 +14,23 @@ import (
 )
 
 type GKE struct {
-	DryRun         bool                   `json:"dry_run"`
-	Verbose        bool                   `json:"verbose"`
-	Token          string                 `json:"token"`
-	GCloudCmd      string                 `json:"gcloud_cmd"`
-	KubectlCmd     string                 `json:"kubectl_cmd"`
-	Project        string                 `json:"project"`
-	Zone           string                 `json:"zone"`
-	Cluster        string                 `json:"cluster"`
-	Namespace      string                 `json:"namespace"`
-	Template       string                 `json:"template"`
-	SecretTemplate string                 `json:"secret_template"`
-	Vars           map[string]interface{} `json:"vars"`
-	Secrets        map[string]string      `json:"secrets"`
+	DryRun          bool                   `json:"dry_run"`
+	Verbose         bool                   `json:"verbose"`
+	KubeInject      bool                   `json:"kube_inject"`
+	Token           string                 `json:"token"`
+	GCloudCmd       string                 `json:"gcloud_cmd"`
+	KubectlCmd      string                 `json:"kubectl_cmd"`
+	IstioctlCmd     string                 `json:"istioctl_cmd"`
+	Project         string                 `json:"project"`
+	Zone            string                 `json:"zone"`
+	Cluster         string                 `json:"cluster"`
+	Namespace       string                 `json:"namespace"`
+	IstioNamespace  string                 `json:"istio_namespace"`
+	IncludeIPRanges string                 `json:"include_ip_ranges"`
+	Template        string                 `json:"template"`
+	SecretTemplate  string                 `json:"secret_template"`
+	Vars            map[string]interface{} `json:"vars"`
+	Secrets         map[string]string      `json:"secrets"`
 
 	// SecretsBase64 holds secret values which are already base64 encoded and
 	// thus don't need to be re-encoded as they would be if they were in
@@ -95,6 +99,7 @@ func wrapMain() error {
 
 	sdkPath := "/google-cloud-sdk"
 	keyPath := "/tmp/gcloud.json"
+	istioctlPath := "/istio"
 
 	// Defaults.
 
@@ -104,6 +109,14 @@ func wrapMain() error {
 
 	if vargs.KubectlCmd == "" {
 		vargs.KubectlCmd = fmt.Sprintf("%s/bin/kubectl", sdkPath)
+	}
+
+	if vargs.IstioctlCmd == "" {
+		vargs.IstioctlCmd = fmt.Sprintf("%s/bin/istioctl", istioctlPath)
+	}
+
+	if vargs.IstioNamespace == "" {
+		vargs.IstioNamespace = "istio-system"
 	}
 
 	if vargs.Template == "" {
@@ -211,6 +224,7 @@ func wrapMain() error {
 
 	outPaths := make(map[string]string)
 	pathArg := []string{}
+	istioInjectedPathArg := []string{}
 
 	for t, content := range mapping {
 		if t == "" {
@@ -293,6 +307,42 @@ func wrapMain() error {
 		if err != nil {
 			return fmt.Errorf("Error: %s\n", err)
 		}
+	}
+
+	if vargs.KubeInject {
+		istioArgsBase := []string{"kube-inject", "--istioNamespace", vargs.IstioNamespace}
+
+		// use `--includeIPRanges`
+		if len(vargs.IncludeIPRanges) > 0 {
+			istioArgsBase = append(istioArgsBase, "--includeIPRanges", vargs.IncludeIPRanges)
+		}
+
+		// Inject istio sidecar proxy into pods
+		for _, manifestPath := range pathArg {
+			manifestBase := filepath.Base(manifestPath)
+			manifestDir := filepath.Dir(manifestPath)
+			manifestExt := filepath.Ext(manifestPath)
+			manifestBaseWithoutExt := strings.Replace(manifestBase, manifestExt, "", 1)
+			// output path would resemble "/tmp/.kube.istio.yml"
+			istioOutputPath := filepath.Join(manifestDir, fmt.Sprintf("%s.istio%s", manifestBaseWithoutExt, manifestExt))
+			// build up remaining arguments
+			istioArgs := []string{}
+			istioArgs = append(istioArgs, istioArgsBase...)
+			istioArgs = append(istioArgs, "--filename", manifestPath, "--output", istioOutputPath)
+			err = runner.Run(vargs.IstioctlCmd, istioArgs...)
+			if err != nil {
+				return fmt.Errorf("Error: %s\n", err)
+			}
+			istioInjectedPathArg = append(istioInjectedPathArg, istioOutputPath)
+		}
+
+		// Apply kube-inject'ed Kubernetes configuration files.
+		err = runner.Run(vargs.KubectlCmd, "apply", "--filename", strings.Join(istioInjectedPathArg, ","))
+		if err != nil {
+			return fmt.Errorf("Error: %s\n", err)
+		}
+
+		return nil
 	}
 
 	// Apply Kubernetes configuration files.
