@@ -43,8 +43,7 @@ go build
 
 ## Testing
 
-**This could use your contribution!**
-Help us create a runnable test suite.
+Please submit a unit test for new additions to the plugin.
 
 ## Docker
 
