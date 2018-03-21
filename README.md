@@ -3,16 +3,23 @@
 [![Build Status](https://beta.drone.io/api/badges/NYTimes/drone-gke/status.svg)](https://beta.drone.io/NYTimes/drone-gke)
 
 Drone plugin to deploy container images to Kubernetes on Google Container Engine.
-For the usage information and a listing of the available options please take a look at [the docs](DOCS.md).
 
 This plugin is a simple wrapper around the `kubectl` and `gcloud` commands, which makes it a little simpler than deploying straight to Kubernetes, because the API endpoints and credentials can be derived using the Google credentials.
 In addition, this opens the yaml file to templatization and customization with each Drone build.
 
+To see the `kubectl` and `gcloud` versions, check out the [Dockerfile dependency download](Dockerfile#L2) and cross reference with the [SDK release notes][sdk].
+
+[sdk]: https://cloud.google.com/sdk/docs/release-notes
+
 ## Drone versions compatibility
 
-For usage in Drone 0.5 and newer, please use a release greater than `0.7`.
+This plugin is actively developed for Drone 0.8+.
 
-For usage in Drone 0.4, please use the `nytimes/drone-gke:0.4` tag.
+For usage in Drone 0.5 and newer, see [these docs](DOCS.md) and use a tag greater than `0.7`.
+
+For usage in Drone 0.4, see [these docs][docs-4] and use the `nytimes/drone-gke:0.4` tag.
+
+[docs-4]: https://github.com/NYTimes/drone-gke/blob/0.4.x/DOCS.md
 
 ## Releases
 
