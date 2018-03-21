@@ -29,12 +29,13 @@ These optional parameters are useful for debugging:
 ## Credentials
 
 `drone-gke` requires a Google service account and uses it's [JSON credential file][service-account] to authenticate.
+The plugin infers the GCP project from the JSON credentials and retrieves the GKE cluster credentials.
 
-This must be passed to the plugin under the target `token`.
+The plugin expects the credential in the `TOKEN` environment variable.
+See the [official documentation](docs-secrets) for uploading secrets.
 
-The plugin infers the GCP project from the JSON credentials (`token`) and retrieves the GKE cluster credentials.
-
-[service-account]: https://cloud.google.com/storage/docs/authentication#service_accounts
+[docs-secrets]: http://docs.drone.io/manage-secrets/
+[service-account]: https://cloud.google.com/iam/docs/service-accounts
 
 ### Setting the JSON token
 
