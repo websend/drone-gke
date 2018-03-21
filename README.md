@@ -8,7 +8,7 @@ For the usage information and a listing of the available options please take a l
 This plugin is a simple wrapper around the `kubectl` and `gcloud` commands, which makes it a little simpler than deploying straight to Kubernetes, because the API endpoints and credentials can be derived using the Google credentials.
 In addition, this opens the yaml file to templatization and customization with each Drone build.
 
-## Drone Compatibility
+## Drone versions compatibility
 
 For usage in Drone 0.5 and newer, please use a release greater than `0.7`.
 
