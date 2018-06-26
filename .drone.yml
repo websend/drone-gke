@@ -13,6 +13,12 @@ pipeline:
     commands:
       - go vet
       - go test -cover -coverprofile=coverage.out
+
+  build:
+    image: golang:1.8
+    environment:
+      - CGO_ENABLED=0
+    commands:
       - go build -a -ldflags "-X main.rev=${DRONE_COMMIT}"
 
   publish_istio:
@@ -25,3 +31,9 @@ pipeline:
       - docker_password
     when:
       event: push
+
+  slack:
+    image: plugins/slack
+    channel: dv-notifications
+    secrets:
+      - slack_webhook
