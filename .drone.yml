@@ -12,6 +12,7 @@ build_config: &build_config
 
 publish_config: &publish_config
   image: plugins/docker
+  group: publish
   repo: nytimes/drone-gke
   secrets:
     - docker_username
