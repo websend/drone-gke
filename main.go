@@ -36,6 +36,7 @@ const (
 	timeoutCmd     = "timeout"
 
 	keyPath          = "/tmp/gcloud.json"
+	kubeconfigPath   = "/tmp/kubeconfig"
 	nsPath           = "/tmp/namespace.json"
 	templateBasePath = "/tmp"
 )
@@ -98,9 +99,9 @@ func getAppFlags() []cli.Flag {
 			EnvVars: []string{"PLUGIN_CLUSTER"},
 		},
 		&cli.BoolFlag{
-			Name:    "skip-fetch-credentials",
-			Usage:   "do not fetch cluster credentials",
-			EnvVars: []string{"PLUGIN_SKIP_FETCH_CREDENTIALS"},
+			Name:    "kubeconfig-credentials",
+			Usage:   "use credentials and context from kubeconfig",
+			EnvVars: []string{"PLUGIN_KUBECONFIG_CREDENTIALS"},
 		},
 		&cli.StringFlag{
 			Name:    "kubeconfig",
@@ -213,11 +214,11 @@ func run(c *cli.Context) error {
 		return err
 	}
 
-	skipFetchCredentials := c.Bool("skip-fetch-credentials")
+	kubeconfigCredentials := c.Bool("kubeconfig-credentials")
 
 	// Use project if explicitly stated, otherwise infer from the service account token.
 	project := c.String("project")
-	if project == "" && !skipFetchCredentials {
+	if project == "" && !kubeconfigCredentials {
 		log("Parsing Project ID from credentials\n")
 		project = getProjectFromToken(c.String("token"))
 		if project == "" {
@@ -251,10 +252,14 @@ func run(c *cli.Context) error {
 	// Setup execution environment
 	environ := os.Environ()
 	environ = append(environ, fmt.Sprintf("GOOGLE_APPLICATION_CREDENTIALS=%s", keyPath))
+	environ = append(environ, fmt.Sprintf("KUBECONFIG=%s", kubeconfigPath))
 	runner := NewBasicRunner("", environ, os.Stdout, os.Stderr)
 
-	if skipFetchCredentials {
+	if kubeconfigCredentials {
 		// Load kubeconfig from environment
+		if err := loadKubeconfig(c, project, runner); err != nil {
+			return err
+		}
 	} else {
 		// Auth with gcloud and fetch kubectl credentials
 		if err := fetchCredentials(c, project, runner); err != nil {
@@ -266,7 +271,12 @@ func run(c *cli.Context) error {
 	// Warn if the keyfile can't be deleted, but don't abort.
 	// We're almost certainly running inside an ephemeral container, so the file will be discarded when we're finished anyway.
 	defer func() {
-		err := os.Remove(keyPath)
+		if kubeconfigCredentials {
+			err = os.Remove(kubeconfigPath)
+		} else {
+			err = os.Remove(keyPath)
+		}
+
 		if err != nil {
 			log("Warning: error removing token file: %s\n", err)
 		}
@@ -326,9 +336,9 @@ func run(c *cli.Context) error {
 
 // checkParams checks required params
 func checkParams(c *cli.Context) error {
-	skipFetchCredentials := c.Bool("skip-fetch-credentials")
+	kubeconfigCredentials := c.Bool("kubeconfig-credentials")
 
-	if skipFetchCredentials {
+	if kubeconfigCredentials {
 		if c.String("kubeconfig") == "" {
 			return fmt.Errorf("Missing required param: kubeconfig")
 		}
@@ -469,6 +479,17 @@ func parseSecrets() (map[string]string, error) {
 	}
 
 	return secrets, nil
+}
+
+// loadKubeconfig loads the kubectl config from the environment, and saves it at the correct location
+func loadKubeconfig(c *cli.Context, project string, runner Runner) error {
+	err := ioutil.WriteFile(kubeconfigPath, []byte(c.String("kubeconfig")), 0600)
+
+	if err != nil {
+		return fmt.Errorf("Error writing kubeconfig file: %s\n", err)
+	}
+
+	return nil
 }
 
 // fetchCredentials authenticates with gcloud and fetches credentials for kubectl
@@ -630,6 +651,8 @@ func printKubectlVersion(runner Runner) error {
 
 // setNamespace sets namespace of current kubectl context and ensure it exists
 func setNamespace(c *cli.Context, project string, runner Runner) error {
+	kubeconfigCredentials := c.Bool("kubeconfig-credentials")
+
 	namespace := c.String("namespace")
 	if namespace == "" {
 		return nil
@@ -653,7 +676,10 @@ func setNamespace(c *cli.Context, project string, runner Runner) error {
 		clusterLocation = c.String("region")
 	}
 
-	context := strings.Join([]string{"gke", project, clusterLocation, c.String("cluster")}, "_")
+	context := "--current"
+	if !kubeconfigCredentials {
+		context = strings.Join([]string{"gke", project, clusterLocation, c.String("cluster")}, "_")
+	}
 
 	if err := runner.Run(kubectlCmd, "config", "set-context", context, "--namespace", namespace); err != nil {
 		return fmt.Errorf("Error: %s\n", err)

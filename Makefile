@@ -36,6 +36,7 @@ gcloud_default_sdk_tag = alpine
 
 # test resource options
 test_sa_key_path = $(project_tmp_dir)/key.json
+test_kubeconfig_path = $(project_tmp_dir)/kubeconfig
 terraform_base_dir = terraform
 terraform_dir = $(terraform_base_dir)/.terraform
 terraform_state_file = $(terraform_base_dir)/terraform.tfstate
@@ -186,6 +187,7 @@ run : export PLUGIN_REGION ?= $(shell $(gcloud) config get-value compute/region 
 run : export PLUGIN_SECRET_TEMPLATE ?= $(CONFIG_HOME)/.kube.sec.yml
 run : export PLUGIN_TEMPLATE ?= $(CONFIG_HOME)/.kube.yml
 run : export PLUGIN_TOKEN ?= $(shell cat $(test_sa_key_path))
+run : export PLUGIN_KUBECONFIG ?= $(shell `cat $(test_kubeconfig_path)`)"
 run : export PLUGIN_VARS ?= $(shell cat $(CONFIG_HOME)/vars.json)
 run : export PLUGIN_VERBOSE ?= 1
 run : export PLUGIN_ZONE ?= $(shell $(gcloud) config get-value compute/zone 2>/dev/null)
@@ -198,6 +200,8 @@ run : export docker_cmd ?=
 # run docker container using local-example
 .PHONY : run
 run :
+	make drone-gke
+	make docker-image
 	@$(docker) run \
 		--env PLUGIN_CLUSTER \
 		--env PLUGIN_DRY_RUN \
@@ -214,7 +218,7 @@ run :
 		--env PLUGIN_WAIT_DEPLOYMENTS \
 		--env PLUGIN_WAIT_SECONDS \
 		--env PLUGIN_ZONE \
-		--env PLUGIN_SKIP_FETCH_CREDENTIALS \
+		--env PLUGIN_KUBECONFIG_CREDENTIALS \
 		--env PLUGIN_KUBECONFIG \
 		--env SECRET_APP_API_KEY \
 		--env SECRET_BASE64_P12_CERT \
