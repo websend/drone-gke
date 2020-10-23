@@ -271,6 +271,8 @@ func run(c *cli.Context) error {
 	// Warn if the keyfile can't be deleted, but don't abort.
 	// We're almost certainly running inside an ephemeral container, so the file will be discarded when we're finished anyway.
 	defer func() {
+		var err error
+
 		if kubeconfigCredentials {
 			err = os.Remove(kubeconfigPath)
 		} else {
