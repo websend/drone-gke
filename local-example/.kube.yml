@@ -1,5 +1,5 @@
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 
 metadata:
@@ -7,6 +7,10 @@ metadata:
 
 spec:
   replicas: 3
+  selector:
+    matchLabels:
+      app: {{.app_name}}
+      env: {{.env}}
   template:
     metadata:
       labels:
